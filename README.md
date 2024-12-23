@@ -29,11 +29,11 @@ options:
 ```
 
 # Screenshots
-Before:
+## Before
 ![9332cebedaf073e59e09bd739195351](https://github.com/user-attachments/assets/f2c9777c-0ba9-486d-af4e-4e4ef6f294f4)
 ![d5802d6ce8340f9aa0633ba243a18bb](https://github.com/user-attachments/assets/33cdd647-14d9-4652-98e4-1fe92eb92a89)
 ![6d22981ab0e7258f92ce4411df1db58](https://github.com/user-attachments/assets/227100bf-495d-4fc3-883f-cd218eb066d5)
-After:
+## After
 ![image](https://github.com/user-attachments/assets/527400d0-12fb-4376-819f-802304912add)
 ![image](https://github.com/user-attachments/assets/32f30007-deb8-428b-99d8-cb06ea028894)
 ![image](https://github.com/user-attachments/assets/1c0778bf-f938-4d8a-9c5a-8418ad9a1532)
