@@ -2,6 +2,10 @@
 This is a simple script that will refresh the actors from the Jellyfin API.
 I made this to fix the issue where the actor's image are not showing up in the Jellyfin until you click the actor to view the actor's detail page or delete the actor image once.
 
+This script is inspired by a PowerShell script developed by [nagug](https://github.com/nagug/Jellyfin-Actor-Refresh-Script), designed to tackle specific problems such as the Jellyfin actor refresh issue. This problem, where Jellyfin occasionally struggles to update actor information correctly, has been discussed in the Jellyfin thread: [jellyfin/jellyfin#8103](https://github.com/jellyfin/jellyfin/issues/8103).
+
+> **nagug**: While working with the script, it was discovered that this method also helps resolve a separate issue with Infuse:  
+> - Infuse Actor Display Issue: Infuse may not display actors correctly if actor details are present in .nfo files. This script helps mitigate this issue by refreshing the actor metadata in Jellyfin, which in turn can improve actor display in Infuse.
 # How to use
 1. Clone this repository
 2. Run `python main.py -url <Jellyfin URL> -key <Jellyfin API Key>`
@@ -27,6 +31,14 @@ options:
   -r RETRIES, --retries RETRIES
                         Maximum number of retries for failed requests
 ```
+# Features
+- Refreshes actor metadata: Automates API calls to Jellyfin to update actor information.
+- Helps resolve Infuse display issue: Mitigates the issue of Infuse not showing actors correctly when details are in .nfo files.
+- Force flag: Allows processing of all actors, regardless of their image tag status, using the --force flag.
+- Server ping check: Verifies if the Jellyfin server is reachable.
+- Error handling: Includes error handling for API calls and server availability.
+- Progress bar: Displays a progress bar to visually track the refresh process.
+- Informative output: Provides clear and colorful output with status messages and error reporting.
 
 # Screenshots
 ## Before
