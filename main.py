@@ -60,7 +60,7 @@ else RED
             start_time = time.time()
             response = self.session.get(
                 f"{self.api_url}/System/Info/Public",
-                timeout=5
+                timeout=11
             )
             response_time = (time.time() - start_time) * 1000
             speed = self.calculate_speed(len(response.content), 
