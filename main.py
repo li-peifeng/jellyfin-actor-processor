@@ -3,6 +3,7 @@ import shutil
 import sys
 import time
 from typing import Optional, Dict, List
+from concurrent.futures import ThreadPoolExecutor, as_completed
 
 import requests
 
@@ -16,7 +17,7 @@ BLUE = '\033[94m'
 RESET = '\033[0m'
 
 class ActorProcessor:
-    def __init__(self, api_url: str, api_key: str, max_retries: int = 3):
+    def __init__(self, api_url: str, api_key: str, max_retries: int = 3, max_workers: int = 10):
         """Initialize the ActorProcessor with API credentials."""
         self.api_url = api_url.rstrip('/')
         if not self.api_url.endswith('/emby'):
@@ -26,6 +27,7 @@ class ActorProcessor:
         self.user_ids = self.get_uids()
         self.user_id = self.user_ids[0] if self.user_ids else None
         self.max_retries = max_retries
+        self.max_workers = max_workers
 
         if not self.user_id:
             print(f"{RED}✗{RESET} No user IDs found.")
@@ -53,7 +55,7 @@ class ActorProcessor:
             start_time = time.time()
             response = self.session.get(
                 f"{self.api_url}/System/Info/Public",
-                timeout=5
+                timeout=11
             )
             response_time = (time.time() - start_time) * 1000
             speed = self.calculate_speed(len(response.content), response_time)
@@ -75,7 +77,7 @@ class ActorProcessor:
             response = self.session.get(
                 f"{self.api_url}/Persons",
                 params={"api_key": self.api_key, "enableImages": "false"},
-                timeout=10
+                timeout=30
             )
             response_time = (time.time() - start_time) * 1000
             speed = self.calculate_speed(len(response.content), response_time)
@@ -111,55 +113,60 @@ class ActorProcessor:
 
     def _process_person_ids(self, persons: List[Dict]):
         """Process each person with progress tracking."""
-        consecutive_errors = 0
         total = len(persons)
-        
-        for idx, person in enumerate(persons, 1):
-            person_id = person['Id']
-            person_name = person['Name']
-            retry_count = 0
+        with ThreadPoolExecutor(max_workers=self.max_workers) as executor:
+            futures = {executor.submit(self._process_person, person, idx, total): person for idx, person in enumerate(persons, 1)}
             
-            while retry_count <= self.max_retries:
-                try:
-                    start_time = time.time()
-                    response = self.session.get(
-                        f"{self.api_url.replace('/emby', '')}/Users/{self.user_id}/Items/{person_id}",
-                        params={"api_key": self.api_key},
-                        timeout=5
-                    )
-                    response_time = (time.time() - start_time) * 1000
-                    speed = self.calculate_speed(len(response.content), response_time)
-                    
-                    status_emoji = f"{GREEN}✓{RESET}" if response.status_code == 200 else f"{RED}✗{RESET}"
-                    retry_info = f" (Retry {retry_count}/{self.max_retries})" if retry_count > 0 else ""
-                    status = f"{status_emoji} Processing {idx}/{total} - ID: {BLUE}{person_id}{RESET} - Response time: {response_time:.2f}ms, Speed: {speed}{retry_info} - (Name: {person_name})"
-                    
-                    print(f"\r{' ' * TERMINAL_WIDTH}", end='', flush=True)
-                    print(f"\r{status}", end='', flush=True)
-                    
-                    if response.status_code == 200:
-                        consecutive_errors = 0
-                        break
-                    else:
-                        retry_count += 1
-                        if retry_count <= self.max_retries:
-                            print(f"\n{YELLOW}⚠{RESET} Request failed (Status: {response.status_code}). Retrying ({retry_count}/{self.max_retries})...")
-                            time.sleep(0.5)
-                        
-                except requests.exceptions.RequestException as e:
+            for future in as_completed(futures):
+                if future.exception():
+                    print(f"{RED}✗{RESET} Error processing person: {future.exception()}")
+
+    def _process_person(self, person: Dict, idx: int, total: int):
+        """Process a single person with retries."""
+        person_id = person['Id']
+        person_name = person['Name']
+        retry_count = 0
+        consecutive_errors = 0
+        
+        while retry_count <= self.max_retries:
+            try:
+                start_time = time.time()
+                response = self.session.get(
+                    f"{self.api_url.replace('/emby', '')}/Users/{self.user_id}/Items/{person_id}",
+                    params={"api_key": self.api_key},
+                    timeout=5
+                )
+                response_time = (time.time() - start_time) * 1000
+                speed = self.calculate_speed(len(response.content), response_time)
+                
+                status_emoji = f"{GREEN}✓{RESET}" if response.status_code == 200 else f"{RED}✗{RESET}"
+                retry_info = f" (Retry {retry_count}/{self.max_retries})" if retry_count > 0 else ""
+                status = f"{status_emoji} Processing {idx}/{total} - ID: {BLUE}{person_id}{RESET} - Response time: {response_time:.2f}ms, Speed: {speed}{retry_info} - (Name: {person_name})"
+                
+                print(f"\r{' ' * TERMINAL_WIDTH}", end='', flush=True)
+                print(f"\r{status}", end='', flush=True)
+                
+                if response.status_code == 200:
+                    consecutive_errors = 0
+                    break
+                else:
                     retry_count += 1
                     if retry_count <= self.max_retries:
-                        print(f"\n{YELLOW}⚠{RESET} Request error: {str(e)}. Retrying ({retry_count}/{self.max_retries})...")
+                        print(f"\n{YELLOW}⚠{RESET} Request failed (Status: {response.status_code}). Retrying ({retry_count}/{self.max_retries})...")
                         time.sleep(0.5)
-                    else:
-                        consecutive_errors += 1
-                        print(f"\n{RED}✗{RESET} Failed after {self.max_retries} retries: {str(e)}")
-                        
-            if consecutive_errors >= 10:
-                print(f"\n{RED}⚠{RESET} Too many consecutive errors. Stopping.")
-                break
-
-        print()
+                    
+            except requests.exceptions.RequestException as e:
+                retry_count += 1
+                if retry_count <= self.max_retries:
+                    print(f"\n{YELLOW}⚠{RESET} Request error: {str(e)}. Retrying ({retry_count}/{self.max_retries})...")
+                    time.sleep(0.5)
+                else:
+                    consecutive_errors += 1
+                    print(f"\n{RED}✗{RESET} Failed after {self.max_retries} retries: {str(e)}")
+                    
+        if consecutive_errors >= 10:
+            print(f"\n{RED}⚠{RESET} Too many consecutive errors. Stopping.")
+            sys.exit(1)
 
 def main():
     parser = argparse.ArgumentParser(description="Jellyfin Actor Processor")
@@ -167,6 +174,7 @@ def main():
     parser.add_argument("-key", "--api-key", required=True, help="Jellyfin API key")
     parser.add_argument("-f", "--force", action="store_true", help="Process all persons")
     parser.add_argument("-r", "--retries", type=int, default=3, help="Maximum number of retries for failed requests")
+    parser.add_argument("-w", "--workers", type=int, default=10, help="Maximum number of parallel workers")
     args = parser.parse_args()
 
     print(f"{BLUE}ℹ{RESET} Jellyfin Actor Processor")
@@ -174,8 +182,9 @@ def main():
     print(f"{BLUE}ℹ{RESET} API Key: {args.api_key}")
     print(f"{BLUE}ℹ{RESET} Force: {args.force}")
     print(f"{BLUE}ℹ{RESET} Retries: {args.retries}")
+    print(f"{BLUE}ℹ{RESET} Workers: {args.workers}")
 
-    processor = ActorProcessor(args.url, args.api_key, args.retries)
+    processor = ActorProcessor(args.url, args.api_key, args.retries, args.workers)
     
     if not processor.check_server_connectivity():
         sys.exit(1)
