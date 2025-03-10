@@ -70,13 +70,13 @@ class ActorProcessor:
             print(f"{RED}✗{RESET} Connection error: {str(e)}")
             return False
 
-    def fetch_person_data(self) -> Optional[Dict]:
+    def fetch_person_data(self, force : bool = False) -> Optional[Dict]:
         """Fetch person data from the jellyfin server."""
         try:
             start_time = time.time()
             response = self.session.get(
                 f"{self.api_url}/Persons",
-                params={"api_key": self.api_key, "enableImages": "false"},
+                params={"api_key": self.api_key, "enableImages": "false" if force else "true"},
                 timeout=30
             )
             response_time = (time.time() - start_time) * 1000
@@ -91,7 +91,7 @@ class ActorProcessor:
 
     def process_persons(self, force: bool = False):
         """Process persons based on the force flag."""
-        person_data = self.fetch_person_data()
+        person_data = self.fetch_person_data(force)
         if not person_data:
             return
 
