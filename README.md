@@ -1,3 +1,8 @@
+<p align="center">
+  <a href="https://peifeng.li"><img width="184px" alt="logo" src="https://raw.githubusercontent.com/li-peifeng/li-peifeng.github.io/refs/heads/main/logo.png" />
+  </a>
+</p>
+
 # jellyfin-actor-processor
 This is a simple script that will refresh the actors from the Jellyfin API.
 I made this to fix the issue where the actor's image are not showing up in the Jellyfin until you click the actor to view the actor's detail page or delete the actor image once.
